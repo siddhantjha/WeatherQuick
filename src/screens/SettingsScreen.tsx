@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -10,12 +10,18 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { useAuth } from '../hooks/useAuth';
 import { weatherService, Unit } from '../services/WeatherService';
 import { colors } from '../styles/colors';
 
+type RootStackParamList = {
+  BackupRestore: undefined;
+};
+
 const SettingsScreen: React.FC = () => {
-  const { user, logout } = useAuth();
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const { user, isAuthenticated, signOut } = useAuth();
   const [temperatureUnit, setTemperatureUnit] = useState<Unit>(
     weatherService.getTemperatureUnit() === '°C' ? 'metric' : 'imperial'
   );
@@ -42,7 +48,7 @@ const SettingsScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await logout();
+              await signOut();
             } catch (error) {
               console.error('Error logging out:', error);
               Alert.alert('Error', 'Failed to logout');
@@ -156,6 +162,39 @@ const SettingsScreen: React.FC = () => {
               disabled={!notificationsEnabled}
             />
           </View>
+        </View>
+
+        {/* Advanced */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Advanced</Text>
+          
+          <TouchableOpacity 
+            style={styles.linkItem}
+            onPress={() => navigation.navigate('BackupRestore')}
+            disabled={!isAuthenticated}
+          >
+            <View style={styles.linkItemContent}>
+              <Ionicons 
+                name="cloud-outline" 
+                size={24} 
+                color={isAuthenticated ? colors.primary : colors.textSecondary} 
+              />
+              <Text style={[
+                styles.linkText, 
+                { color: isAuthenticated ? colors.text : colors.textSecondary }
+              ]}>
+                Backup & Restore
+              </Text>
+              {!isAuthenticated && (
+                <Text style={styles.loginRequiredText}>Login required</Text>
+              )}
+            </View>
+            <Ionicons 
+              name="chevron-forward" 
+              size={20} 
+              color={isAuthenticated ? colors.textSecondary : colors.border} 
+            />
+          </TouchableOpacity>
         </View>
 
         {/* About */}
@@ -302,13 +341,25 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
+  linkItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
   linkText: {
     fontSize: 16,
     color: colors.text,
+    marginLeft: 12,
+  },
+  loginRequiredText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginLeft: 8,
+    fontStyle: 'italic',
   },
   versionInfo: {
+    paddingVertical: 16,
     alignItems: 'center',
-    marginTop: 16,
   },
   versionText: {
     fontSize: 14,

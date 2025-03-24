@@ -13,6 +13,9 @@ import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import WeatherHomeScreen from '../screens/WeatherHomeScreen';
 import LocationManagementScreen from '../screens/LocationManagementScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import RecommendationsScreen from '../screens/RecommendationsScreen';
+import WeatherMapScreen from '../screens/WeatherMapScreen';
+import WeatherComparisonScreen from '../screens/WeatherComparisonScreen';
 import { useAuth } from '../hooks/useAuth';
 import { colors } from '../styles/colors';
 
@@ -20,6 +23,9 @@ import { colors } from '../styles/colors';
 const AuthStack = createNativeStackNavigator();
 const WeatherStack = createNativeStackNavigator();
 const SettingsStack = createNativeStackNavigator();
+const RecommendationsStack = createNativeStackNavigator();
+const MapsStack = createNativeStackNavigator();
+const ComparisonStack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 // Auth Navigator
@@ -51,6 +57,11 @@ const WeatherNavigator = () => {
         component={LocationManagementScreen}
         options={{ headerShown: false }}
       />
+      <WeatherStack.Screen
+        name="WeatherComparison"
+        component={ComparisonNavigator}
+        options={{ headerShown: false }}
+      />
     </WeatherStack.Navigator>
   );
 };
@@ -65,6 +76,45 @@ const SettingsNavigator = () => {
         options={{ headerShown: false }}
       />
     </SettingsStack.Navigator>
+  );
+};
+
+// Recommendations Navigator
+const RecommendationsNavigator = () => {
+  return (
+    <RecommendationsStack.Navigator>
+      <RecommendationsStack.Screen
+        name="RecommendationsHome"
+        component={RecommendationsScreen}
+        options={{ headerShown: false }}
+      />
+    </RecommendationsStack.Navigator>
+  );
+};
+
+// Maps Navigator
+const MapsNavigator = () => {
+  return (
+    <MapsStack.Navigator>
+      <MapsStack.Screen
+        name="WeatherMap"
+        component={WeatherMapScreen}
+        options={{ headerShown: false }}
+      />
+    </MapsStack.Navigator>
+  );
+};
+
+// Comparison Navigator
+const ComparisonNavigator = () => {
+  return (
+    <ComparisonStack.Navigator>
+      <ComparisonStack.Screen
+        name="WeatherComparison"
+        component={WeatherComparisonScreen}
+        options={{ headerShown: false }}
+      />
+    </ComparisonStack.Navigator>
   );
 };
 
@@ -88,6 +138,10 @@ const TabNavigator = () => {
             iconName = focused ? 'cloud' : 'cloud-outline';
           } else if (route.name === 'Settings') {
             iconName = focused ? 'settings' : 'settings-outline';
+          } else if (route.name === 'Recommendations') {
+            iconName = focused ? 'compass' : 'compass-outline';
+          } else if (route.name === 'Maps') {
+            iconName = focused ? 'map' : 'map-outline';
           }
 
           return <Ionicons name={iconName as any} size={size} color={color} />;
@@ -95,6 +149,8 @@ const TabNavigator = () => {
       })}
     >
       <Tab.Screen name="Weather" component={WeatherNavigator} />
+      <Tab.Screen name="Recommendations" component={RecommendationsNavigator} />
+      <Tab.Screen name="Maps" component={MapsNavigator} />
       <Tab.Screen name="Settings" component={SettingsNavigator} />
     </Tab.Navigator>
   );

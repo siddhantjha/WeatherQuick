@@ -19,9 +19,13 @@ export const colors = {
   
   // Status colors
   error: '#e74c3c',
+  errorLight: '#fadbd8',
   warning: '#f39c12',
+  warningLight: '#fdebd0',
   success: '#2ecc71',
+  successLight: '#d5f5e3',
   info: '#3498db',
+  infoLight: '#d6eaf8',
   
   // Common colors
   white: '#ffffff',
@@ -69,9 +73,13 @@ export const darkColors = {
   
   // Status colors
   error: '#e74c3c',
+  errorLight: '#5c2823',
   warning: '#f39c12',
+  warningLight: '#5e3f11',
   success: '#2ecc71',
+  successLight: '#1e6840',
   info: '#3498db',
+  infoLight: '#1d4e70',
   
   // Common colors
   white: '#ffffff',
