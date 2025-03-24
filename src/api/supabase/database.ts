@@ -9,12 +9,12 @@ export type UserProfile = {
 };
 
 export type UserLocation = {
-  id: string;
+  id?: string;
   user_id: string;
   name: string;
   latitude: number;
   longitude: number;
-  is_default: boolean;
+  is_default?: boolean;
   position: number;
 };
 
@@ -26,6 +26,12 @@ export type UserSubscription = {
   starts_at: string;
   ends_at: string;
 };
+
+interface LocationResult {
+  success: boolean;
+  id?: string;
+  error?: Error | string;
+}
 
 // User Profile Operations
 export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
@@ -69,117 +75,170 @@ export const updateUserProfile = async (
 export const getUserLocations = async (userId: string): Promise<UserLocation[]> => {
   try {
     const { data, error } = await supabase
-      .from('user_locations')
+      .from('locations')
       .select('*')
       .eq('user_id', userId)
-      .order('position', { ascending: true });
+      .order('position');
 
     if (error) {
-      console.error('Error getting user locations:', error);
+      console.error('Error fetching user locations:', error);
       return [];
     }
 
     return data || [];
   } catch (error) {
-    console.error('Exception getting user locations:', error);
+    console.error('Exception while fetching user locations:', error);
     return [];
   }
 };
 
-export const addUserLocation = async (
-  location: Omit<UserLocation, 'id'>
-): Promise<{ success: boolean; id?: string; error: any | null }> => {
+export const addUserLocation = async (location: UserLocation): Promise<LocationResult> => {
   try {
-    // Check if user has reached their location limit
-    const isSubscribed = await checkUserSubscription(location.user_id);
-    const { count } = await supabase
-      .from('user_locations')
-      .select('*', { count: 'exact', head: true })
+    // Get the user's current location count
+    const { data: existingLocations, error: countError } = await supabase
+      .from('locations')
+      .select('id')
       .eq('user_id', location.user_id);
 
-    // Free users can only have 3 locations
-    if (!isSubscribed && (count || 0) >= 3) {
-      return {
-        success: false,
-        error: 'Free users can only save up to 3 locations. Upgrade to premium for unlimited locations.',
+    if (countError) {
+      return { success: false, error: countError };
+    }
+
+    // Check if user has reached the location limit (for free users)
+    // This should be integrated with the subscription logic later
+    const isFreeTier = true; // Placeholder for subscription check
+    if (isFreeTier && existingLocations && existingLocations.length >= 3) {
+      return { 
+        success: false, 
+        error: 'Free users can only save up to 3 locations. Upgrade to Premium for unlimited locations.'
       };
     }
 
     const { data, error } = await supabase
-      .from('user_locations')
+      .from('locations')
       .insert(location)
-      .select();
+      .select('id')
+      .single();
 
     if (error) {
       return { success: false, error };
     }
 
-    return { success: true, id: data[0].id, error: null };
+    return { success: true, id: data.id };
   } catch (error) {
-    console.error('Exception adding user location:', error);
-    return { success: false, error };
+    return { success: false, error: error as Error };
   }
 };
 
 export const updateUserLocation = async (
   locationId: string,
-  userId: string,
   updates: Partial<UserLocation>
-): Promise<{ success: boolean; error: any | null }> => {
+): Promise<LocationResult> => {
   try {
-    const { error } = await supabase
-      .from('user_locations')
+    const { data, error } = await supabase
+      .from('locations')
       .update(updates)
       .eq('id', locationId)
-      .eq('user_id', userId);
+      .select('id')
+      .single();
 
-    return { success: !error, error };
+    if (error) {
+      return { success: false, error };
+    }
+
+    return { success: true, id: data.id };
   } catch (error) {
-    console.error('Exception updating user location:', error);
-    return { success: false, error };
+    return { success: false, error: error as Error };
   }
 };
 
-export const deleteUserLocation = async (
-  locationId: string,
-  userId: string
-): Promise<{ success: boolean; error: any | null }> => {
+export const deleteUserLocation = async (locationId: string): Promise<boolean> => {
   try {
     const { error } = await supabase
-      .from('user_locations')
+      .from('locations')
       .delete()
-      .eq('id', locationId)
-      .eq('user_id', userId);
+      .eq('id', locationId);
 
-    return { success: !error, error };
+    return !error;
   } catch (error) {
-    console.error('Exception deleting user location:', error);
-    return { success: false, error };
+    console.error('Error deleting location:', error);
+    return false;
   }
 };
 
-export const setDefaultLocation = async (
-  locationId: string,
-  userId: string
-): Promise<{ success: boolean; error: any | null }> => {
+export const setDefaultLocation = async (locationId: string, userId: string): Promise<boolean> => {
   try {
-    // First, set all locations to non-default
-    await supabase
-      .from('user_locations')
+    // First, unset all default locations for this user
+    const { error: resetError } = await supabase
+      .from('locations')
       .update({ is_default: false })
       .eq('user_id', userId);
 
-    // Then set the selected location as default
-    const { error } = await supabase
-      .from('user_locations')
-      .update({ is_default: true })
-      .eq('id', locationId)
-      .eq('user_id', userId);
+    if (resetError) {
+      console.error('Error resetting default locations:', resetError);
+      return false;
+    }
 
-    return { success: !error, error };
+    // Then set the new default location
+    const { error } = await supabase
+      .from('locations')
+      .update({ is_default: true })
+      .eq('id', locationId);
+
+    return !error;
   } catch (error) {
-    console.error('Exception setting default location:', error);
-    return { success: false, error };
+    console.error('Error setting default location:', error);
+    return false;
+  }
+};
+
+// Get a user's default location
+export const getDefaultLocation = async (userId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('locations')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_default', true)
+      .single();
+
+    if (error) {
+      // If no default location is found, try to get the first location
+      const { data: firstLocation, error: firstLocationError } = await supabase
+        .from('locations')
+        .select('*')
+        .eq('user_id', userId)
+        .order('position')
+        .limit(1)
+        .single();
+
+      if (firstLocationError) {
+        return null;
+      }
+
+      return firstLocation;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error getting default location:', error);
+    return null;
+  }
+};
+
+// Update the order of locations
+export const updateLocationOrder = async (userId: string, locationIds: string[]): Promise<boolean> => {
+  try {
+    // Start a transaction to update all positions
+    await supabase.rpc('update_location_positions', {
+      user_id_param: userId,
+      location_ids: locationIds
+    });
+    
+    return true;
+  } catch (error) {
+    console.error('Error updating location order:', error);
+    return false;
   }
 };
 
