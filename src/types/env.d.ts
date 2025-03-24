@@ -1,0 +1,6 @@
+declare module '@env' {
+  export const SUPABASE_URL: string;
+  export const SUPABASE_ANON_KEY: string;
+  export const OPENWEATHERMAP_API_KEY: string;
+  export const APP_ENV: 'development' | 'production';
+} 

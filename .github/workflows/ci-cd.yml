@@ -1,0 +1,142 @@
+name: WeatherQuick CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Lint
+        run: yarn lint
+
+      - name: Type checking
+        run: yarn typescript
+
+      - name: Run tests
+        run: yarn test
+
+  build-android:
+    name: Build Android
+    needs: test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v2
+
+      - name: Create .env file
+        run: |
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" > .env
+          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
+          echo "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" >> .env
+
+      - name: Build Android Release
+        run: |
+          cd android
+          ./gradlew bundleRelease
+
+      - name: Upload Android Bundle
+        uses: actions/upload-artifact@v3
+        with:
+          name: android-bundle
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 5
+
+  build-ios:
+    name: Build iOS
+    needs: test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Install CocoaPods dependencies
+        run: |
+          cd ios
+          pod install
+
+      - name: Create .env file
+        run: |
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" > .env
+          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
+          echo "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" >> .env
+
+      - name: Build iOS
+        run: |
+          cd ios
+          xcodebuild -workspace WeatherQuick.xcworkspace -scheme WeatherQuick -configuration Release -sdk iphoneos -archivePath $RUNNER_TEMP/WeatherQuick.xcarchive archive CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGN_ENTITLEMENTS="" CODE_SIGNING_ALLOWED=NO
+
+  deploy-dev:
+    name: Deploy to Development
+    needs: [build-android, build-ios]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Android Bundle
+        uses: actions/download-artifact@v3
+        with:
+          name: android-bundle
+          path: artifacts
+
+      - name: Notify Deployment
+        run: echo "Deployed to development environment"
+
+  deploy-prod:
+    name: Deploy to Production
+    needs: [build-android, build-ios]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Android Bundle
+        uses: actions/download-artifact@v3
+        with:
+          name: android-bundle
+          path: artifacts
+
+      - name: Notify Deployment
+        run: echo "Deployed to production environment" 
